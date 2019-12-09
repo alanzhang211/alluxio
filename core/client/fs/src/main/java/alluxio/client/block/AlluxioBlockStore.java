@@ -70,9 +70,9 @@ public final class AlluxioBlockStore {
   private final TieredIdentity mTieredIdentity;
 
   /** Cached map for workers. */
-  private List<BlockWorkerInfo> mWorkerInfoList = null;
+  private List<BlockWorkerInfo> mWorkerInfoList = null;//block缓存
   /** The policy to refresh workers list. */
-  private final RefreshPolicy mWorkerRefreshPolicy;
+  private final RefreshPolicy mWorkerRefreshPolicy;//worker定时刷新处理
 
   /**
    * Creates an Alluxio block store with default local hostname.
@@ -323,10 +323,10 @@ public final class AlluxioBlockStore {
     // The number of initial copies depends on the write type: if ASYNC_THROUGH, it is the property
     // "alluxio.user.file.replication.durable" before data has been persisted; otherwise
     // "alluxio.user.file.replication.min"
-    int initialReplicas = (options.getWriteType() == WriteType.ASYNC_THROUGH
+    int initialReplicas = (options.getWriteType() == WriteType.ASYNC_THROUGH //异步写入
         && options.getReplicationDurable() > options.getReplicationMin())
         ? options.getReplicationDurable() : options.getReplicationMin();
-    if (initialReplicas <= 1) {
+    if (initialReplicas <= 1) {//小于等于1，采用本地处理
       address = locationPolicy.getWorker(workerOptions);
       if (address == null) {
         if (getEligibleWorkers().isEmpty()) {
@@ -340,7 +340,7 @@ public final class AlluxioBlockStore {
 
     // Group different block workers by their hostnames
     Map<String, Set<BlockWorkerInfo>> blockWorkersByHost = new HashMap<>();
-    for (BlockWorkerInfo blockWorker : workerOptions.getBlockWorkerInfos()) {
+    for (BlockWorkerInfo blockWorker : workerOptions.getBlockWorkerInfos()) {//副本大于1，缓存相同host下的所有blockWorker
       String hostName = blockWorker.getNetAddress().getHost();
       if (blockWorkersByHost.containsKey(hostName)) {
         blockWorkersByHost.get(hostName).add(blockWorker);
@@ -352,14 +352,14 @@ public final class AlluxioBlockStore {
     // Select N workers on different hosts where N is the value of initialReplicas for this block
     List<WorkerNetAddress> workerAddressList = new ArrayList<>();
     List<BlockWorkerInfo> updatedInfos = Lists.newArrayList(workerOptions.getBlockWorkerInfos());
-    for (int i = 0; i < initialReplicas; i++) {
+    for (int i = 0; i < initialReplicas; i++) {//选取worker
       address = locationPolicy.getWorker(workerOptions);
       if (address == null) {
         break;
       }
       workerAddressList.add(address);
-      updatedInfos.removeAll(blockWorkersByHost.get(address.getHost()));
-      workerOptions.setBlockWorkerInfos(updatedInfos);
+      updatedInfos.removeAll(blockWorkersByHost.get(address.getHost()));//去除被选中的worker
+      workerOptions.setBlockWorkerInfos(updatedInfos);//更新
     }
     if (workerAddressList.size() < initialReplicas) {
       throw new alluxio.exception.status.ResourceExhaustedException(String.format(

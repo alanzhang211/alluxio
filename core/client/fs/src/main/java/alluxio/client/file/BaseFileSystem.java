@@ -90,8 +90,8 @@ public class BaseFileSystem implements FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(BaseFileSystem.class);
 
   protected final FileSystemContext mFsContext;
-  protected final AlluxioBlockStore mBlockStore;
-  protected final boolean mCachingEnabled;
+  protected final AlluxioBlockStore mBlockStore;//block管理
+  protected final boolean mCachingEnabled;//是否开启缓存
 
   protected volatile boolean mClosed = false;
 

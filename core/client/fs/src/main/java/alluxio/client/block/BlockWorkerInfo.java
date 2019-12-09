@@ -25,9 +25,9 @@ import javax.annotation.concurrent.ThreadSafe;
 @PublicApi
 @ThreadSafe
 public final class BlockWorkerInfo {
-  private final WorkerNetAddress mNetAddress;
-  private final long mCapacityBytes;
-  private final long mUsedBytes;
+  private final WorkerNetAddress mNetAddress;//地址
+  private final long mCapacityBytes;//存储量
+  private final long mUsedBytes;//已使用直接
 
   /**
    * Constructs the block worker information.

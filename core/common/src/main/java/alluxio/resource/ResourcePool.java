@@ -177,5 +177,5 @@ public abstract class ResourcePool<T> implements Pool<T> {
    *
    * @return a resource which will be added to the pool of resources
    */
-  protected abstract T createNewResource();
+  protected abstract T createNewResource();//抽象方法，下沉到子类实现
 }

@@ -38,7 +38,7 @@ public class TimeoutRefresh implements RefreshPolicy {
   }
 
   @Override
-  public boolean attempt() {
+  public boolean attempt() {//首次或者到了刷新时间间隔，触发刷新操作
     if (mFirstAttempt || (CommonUtils.getCurrentMs() - mLastAttempTimeMs) > mRefreshPeriodMs) {
       mLastAttempTimeMs = CommonUtils.getCurrentMs();
       mFirstAttempt = false;

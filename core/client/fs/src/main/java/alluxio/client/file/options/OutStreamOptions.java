@@ -41,19 +41,19 @@ import javax.annotation.concurrent.NotThreadSafe;
 @PublicApi
 @NotThreadSafe
 public final class OutStreamOptions {
-  private FileSystemMasterCommonPOptions mCommonOptions;
+  private FileSystemMasterCommonPOptions mCommonOptions;//文件或者文件夹的生命周期ttl；ttl触发action；同步间隔时间
   private long mBlockSizeBytes;
-  private BlockLocationPolicy mLocationPolicy;
-  private int mWriteTier;
-  private WriteType mWriteType;
+  private BlockLocationPolicy mLocationPolicy;//文件写，block位置选择策略
+  private int mWriteTier;//数据块写入的默认存储层。可选值为整型数值。非负值代表从高层到底层的存储层（0代表第一层存储层，１代表第二层存储层，以此类推）。如果给定值大于存储层数量,这个数字代表最底层的存储层。负值代表从底层到高层的存储层（-1代表最底层存储层，-2代表次底层存储层，以此类推）如果给定值的绝对值大于存储层数量，这个数字代表最高层存储层。
+  private WriteType mWriteType;//创建alluxio文件写入类型：`MUST_CACHE` (数据仅仅存储在Alluxio中，并且必须存储在其中), `CACHE_THROUGH` (尽量缓冲数据，同时同步写入到底层文件系统), `THROUGH` (不缓冲数据，同步写入到底层文件系统)
   private String mOwner;
   private String mGroup;
   private Mode mMode;
   private AccessControlList mAcl;
   private long mPersistenceWaitTime;
-  private int mReplicationDurable;
-  private int mReplicationMax;
-  private int mReplicationMin;
+  private int mReplicationDurable;//副本
+  private int mReplicationMax;//最大副本
+  private int mReplicationMin;//最小副本
   private String mUfsPath;
   private long mMountId;
   private String mMediumType;

@@ -56,8 +56,8 @@ public final class BlockMasterClientPool extends ResourcePool<BlockMasterClient>
 
   @Override
   protected BlockMasterClient createNewResource() {
-    BlockMasterClient client = BlockMasterClient.Factory.create(mMasterContext);
-    mClientList.add(client);
+    BlockMasterClient client = BlockMasterClient.Factory.create(mMasterContext);//内部类的工厂方法创建实例
+    mClientList.add(client);//加入缓存queue
     return client;
   }
 }
