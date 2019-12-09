@@ -35,10 +35,10 @@ public interface UfsManager extends Closeable {
   class UfsClient {
     private static final Logger LOG = LoggerFactory.getLogger(UfsClient.class);
 
-    private final AtomicReference<UnderFileSystem> mUfs;
+    private final AtomicReference<UnderFileSystem> mUfs;//原子引用保持一致性
     private final AlluxioURI mUfsMountPointUri;
     private final Supplier<UnderFileSystem> mUfsSupplier;
-    private final Counter mCounter;
+    private final Counter mCounter;//metrics信息
 
     /**
      * @param ufsSupplier the supplier function to create a new UFS instance
@@ -58,7 +58,7 @@ public interface UfsManager extends Closeable {
     public CloseableResource<UnderFileSystem> acquireUfsResource() {
       if (mUfs.get() == null) {
         UnderFileSystem ufs = mUfsSupplier.get();
-        if (!mUfs.compareAndSet(null, ufs)) {
+        if (!mUfs.compareAndSet(null, ufs)) {//为什么要关闭？fs一个耗时对象，为什么不缓存？
           // Another thread already added this ufs, close this one.
           try {
             ufs.close();

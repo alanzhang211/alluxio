@@ -66,7 +66,7 @@ public final class JobUfsManager extends AbstractUfsManager {
 
     UfsInfo info;
     try {
-      info = mMasterClient.getUfsInfo(mountId);
+      info = mMasterClient.getUfsInfo(mountId);//获取存储文件元数据信息
     } catch (IOException e) {
       throw new UnavailableException(
           String.format("Failed to create UFS info for mount point with id %d", mountId), e);
