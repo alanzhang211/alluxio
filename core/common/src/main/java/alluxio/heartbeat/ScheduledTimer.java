@@ -37,9 +37,9 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public final class ScheduledTimer implements HeartbeatTimer {
   private final String mThreadName;
-  private final Lock mLock;
+  private final Lock mLock;//实例锁
   /** This condition is signaled to tell the heartbeat thread to do a run. */
-  private final Condition mTickCondition;
+  private final Condition mTickCondition;//条件变量，线程间通信
   /** True when schedule() has been called, but tick() hasn't finished. **/
   private volatile boolean mScheduled;
 
@@ -84,9 +84,9 @@ public final class ScheduledTimer implements HeartbeatTimer {
    */
   public void tick() throws InterruptedException {
     try (LockResource r = new LockResource(mLock)) {
-      HeartbeatScheduler.addTimer(this);
+      HeartbeatScheduler.addTimer(this);//将当前锁定时器实例加入调度
       // Wait in a loop to handle spurious wakeups
-      while (!mScheduled) {
+      while (!mScheduled) {//schedule没有被执行，等待
         mTickCondition.await();
       }
 

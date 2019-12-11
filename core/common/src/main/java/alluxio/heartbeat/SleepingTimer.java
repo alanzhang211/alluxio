@@ -34,8 +34,8 @@ public final class SleepingTimer implements HeartbeatTimer {
   private long mPreviousTickMs;
   private final String mThreadName;
   private final Logger mLogger;
-  private final Clock mClock;
-  private final Sleeper mSleeper;
+  private final Clock mClock;//时钟
+  private final Sleeper mSleeper;//
 
   /**
    * Creates a new instance of {@link SleepingTimer}.

@@ -35,9 +35,9 @@ public final class HeartbeatThread implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatThread.class);
 
   private final String mThreadName;
-  private final HeartbeatExecutor mExecutor;
+  private final HeartbeatExecutor mExecutor;//心跳执行
   private final UserState mUserState;
-  private HeartbeatTimer mTimer;
+  private HeartbeatTimer mTimer;//心跳定时器
   private AlluxioConfiguration mConfiguration;
 
   /**
@@ -115,15 +115,15 @@ public final class HeartbeatThread implements Runnable {
       // Thread.interrupted() clears the interrupt status. Do not call interrupt again to clear it.
       while (!Thread.interrupted()) {
         // TODO(peis): Fix this. The current implementation consumes one thread even when ticking.
-        mTimer.tick();
-        mExecutor.heartbeat();
+        mTimer.tick();//开始记时
+        mExecutor.heartbeat();//执行心跳
       }
     } catch (InterruptedException e) {
       // Allow thread to exit.
     } catch (Exception e) {
       LOG.error("Uncaught exception in heartbeat executor, Heartbeat Thread shutting down", e);
     } finally {
-      mExecutor.close();
+      mExecutor.close();//关闭，释放资源
     }
   }
 }

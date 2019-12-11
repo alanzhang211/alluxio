@@ -47,8 +47,8 @@ public final class HeartbeatScheduler {
    * waiting to be scheduled.
    */
   private static Map<String, ScheduledTimer> sTimers = new HashMap<>();
-  private static Lock sLock = new ReentrantLock();
-  private static Condition sCondition = sLock.newCondition();
+  private static Lock sLock = new ReentrantLock();//静态锁，类锁；保证类的线程安全。
+  private static Condition sCondition = sLock.newCondition();//等待队列，主要目的等待给定timer是否被调度
 
   private HeartbeatScheduler() {} // to prevent initialization
 
@@ -57,11 +57,11 @@ public final class HeartbeatScheduler {
    */
   public static void addTimer(ScheduledTimer timer) {
     Preconditions.checkNotNull(timer, "timer");
-    try (LockResource r = new LockResource(sLock)) {
+    try (LockResource r = new LockResource(sLock)) {//资源锁，获取sLock锁对象
       Preconditions.checkState(!sTimers.containsKey(timer.getThreadName()),
           "The timer for thread %s is already waiting to be scheduled", timer.getThreadName());
-      sTimers.put(timer.getThreadName(), timer);
-      sCondition.signalAll();
+      sTimers.put(timer.getThreadName(), timer);//将定时器加入缓存
+      sCondition.signalAll();//唤醒所有等待线程
     }
   }
 
@@ -125,7 +125,7 @@ public final class HeartbeatScheduler {
    */
   public static void await(String name) throws InterruptedException {
     try (LockResource r = new LockResource(sLock)) {
-      while (!sTimers.containsKey(name)) {
+      while (!sTimers.containsKey(name)) {//如果定时器不存在，线程等待
         sCondition.await();
       }
     }

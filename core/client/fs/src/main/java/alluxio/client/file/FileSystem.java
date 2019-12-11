@@ -86,7 +86,7 @@ public interface FileSystem extends Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(Factory.class);
     private static final AtomicBoolean CONF_LOGGED = new AtomicBoolean(false);
 
-    protected static final FileSystem.Cache FILESYSTEM_CACHE = new FileSystem.Cache();
+    protected static final FileSystem.Cache FILESYSTEM_CACHE = new FileSystem.Cache();//缓存filesystem，创建filesystem是开销比较大
 
     private Factory() {} // prevent instantiation
 
@@ -141,14 +141,14 @@ public interface FileSystem extends Closeable {
         // Sort properties by name to keep output ordered.
         AlluxioConfiguration conf = context.getClusterConf();
         List<PropertyKey> keys = new ArrayList<>(conf.keySet());
-        keys.sort(Comparator.comparing(PropertyKey::getName));
+        keys.sort(Comparator.comparing(PropertyKey::getName));//list.sort比较
         for (PropertyKey key : keys) {
           String value = conf.getOrDefault(key, null);
           Source source = conf.getSource(key);
           LOG.debug("{}={} ({})", key.getName(), value, source);
         }
       }
-      if (context.getClusterConf().getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)) {
+      if (context.getClusterConf().getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)) {//是否开启元数据缓存
         return new CachingFileSystem(context, cachingEnabled);
       }
       return BaseFileSystem.create(context, cachingEnabled);
@@ -172,7 +172,7 @@ public interface FileSystem extends Closeable {
      */
     public FileSystem get(FileSystemKey key) {
       return mCacheMap.computeIfAbsent(key, (fileSystemKey) ->
-          Factory.create(FileSystemContext.create(key.mSubject, key.mConf), true));
+          Factory.create(FileSystemContext.create(key.mSubject, key.mConf), true));//缓存
     }
 
     /**

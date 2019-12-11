@@ -136,7 +136,7 @@ public final class BlockMasterSync implements HeartbeatExecutor {
         LOG.error("Failed to receive or execute master heartbeat command: {}",
             cmdFromMaster.toString(), e);
       }
-      mMasterClient.disconnect();
+      mMasterClient.disconnect();//断开链接
       if (mHeartbeatTimeoutMs > 0) {
         if (System.currentTimeMillis() - mLastSuccessfulHeartbeatMs >= mHeartbeatTimeoutMs) {
           if (ServerConfiguration.getBoolean(PropertyKey.TEST_MODE)) {
