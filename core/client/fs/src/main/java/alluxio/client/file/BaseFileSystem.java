@@ -180,7 +180,7 @@ public class BaseFileSystem implements FileSystem {
     return rpc(client -> {
       CreateFilePOptions mergedOptions = FileSystemOptions.createFileDefaults(
           mFsContext.getPathConf(path)).toBuilder().mergeFrom(options).build();
-      URIStatus status = client.createFile(path, mergedOptions);
+      URIStatus status = client.createFile(path, mergedOptions);//客户端创建文件，没有写数据
       LOG.debug("Created file {}, options: {}", path.getPath(), mergedOptions);
       OutStreamOptions outStreamOptions =
           new OutStreamOptions(mergedOptions, mFsContext.getClientContext(),
@@ -189,9 +189,9 @@ public class BaseFileSystem implements FileSystem {
       outStreamOptions.setMountId(status.getMountId());
       outStreamOptions.setAcl(status.getAcl());
       try {
-        return new FileOutStream(path, outStreamOptions, mFsContext);
+        return new FileOutStream(path, outStreamOptions, mFsContext);//开始写数据
       } catch (Exception e) {
-        delete(path);
+        delete(path);//写出现异常，删除创建的文件
         throw e;
       }
     });

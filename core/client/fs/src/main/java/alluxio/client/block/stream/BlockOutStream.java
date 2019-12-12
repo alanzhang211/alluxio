@@ -213,7 +213,7 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
     if (mClosed) {
       return;
     }
-    releaseCurrentChunk();
+    releaseCurrentChunk();//释放数据包
 
     List<Exception> exceptions = new LinkedList<>();
     for (DataWriter dataWriter : mDataWriters) {
@@ -238,7 +238,7 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
       return;
     }
     try {
-      updateCurrentChunk(true);
+      updateCurrentChunk(true);//关闭是要判断是不是最后的数据包
     } catch (Throwable t) {
       throw mCloser.rethrow(t);
     } finally {

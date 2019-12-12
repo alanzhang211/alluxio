@@ -59,7 +59,7 @@ public class FileSystemOptions {
    * @return options based on the configuration
    */
   public static CreateDirectoryPOptions createDirectoryDefaults(AlluxioConfiguration conf) {
-    return CreateDirectoryPOptions.newBuilder()
+    return CreateDirectoryPOptions.newBuilder()//建造者模式
         .setAllowExists(false)
         .setCommonOptions(commonDefaults(conf))
         .setMode(ModeUtils.applyDirectoryUMask(Mode.defaults(),

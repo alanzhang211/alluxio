@@ -60,7 +60,7 @@ public class FileOutStream extends AbstractOutStream {
   private static final Logger LOG = LoggerFactory.getLogger(FileOutStream.class);
 
   /** Used to manage closeable resources. */
-  private final Closer mCloser;
+  private final Closer mCloser;//单利类
   private final long mBlockSize;
   private final AlluxioStorageType mAlluxioStorageType;
   private final UnderStorageType mUnderStorageType;
@@ -106,7 +106,7 @@ public class FileOutStream extends AbstractOutStream {
       mShouldCacheCurrentBlock = mAlluxioStorageType.isStore();
       mBytesWritten = 0;
 
-      if (!mUnderStorageType.isSyncPersist()) {
+      if (!mUnderStorageType.isSyncPersist()) {//不是同步持久化数据
         mUnderStorageOutputStream = null;
       } else { // Write is through to the under storage, create mUnderStorageOutputStream.
         GetWorkerOptions getWorkerOptions = GetWorkerOptions.defaults()
@@ -145,16 +145,16 @@ public class FileOutStream extends AbstractOutStream {
       }
 
       CompleteFilePOptions.Builder optionsBuilder = CompleteFilePOptions.newBuilder();
-      if (mUnderStorageType.isSyncPersist()) {
+      if (mUnderStorageType.isSyncPersist()) {//ufs同步持久化
         if (mCanceled) {
-          mUnderStorageOutputStream.cancel();
+          mUnderStorageOutputStream.cancel();//关闭ufs数据流
         } else {
           mUnderStorageOutputStream.close();
           optionsBuilder.setUfsLength(mBytesWritten);
         }
       }
 
-      if (mAlluxioStorageType.isStore()) {
+      if (mAlluxioStorageType.isStore()) {//alluxio本地存储
         if (mCanceled) {
           for (BlockOutStream bos : mPreviousBlockOutStreams) {
             bos.cancel();
@@ -172,7 +172,7 @@ public class FileOutStream extends AbstractOutStream {
         }
       }
 
-      // Whether to complete file with async persist request.
+      // Whether to complete file with async persist request.异步写
       if (!mCanceled && mUnderStorageType.isAsyncPersist()
           && mOptions.getPersistenceWaitTime() != Constants.NO_AUTO_PERSIST) {
         optionsBuilder.setAsyncPersistOptions(
@@ -199,7 +199,7 @@ public class FileOutStream extends AbstractOutStream {
   @Override
   public void flush() throws IOException {
     // TODO(yupeng): Handle flush for Alluxio storage stream as well.
-    if (mUnderStorageType.isSyncPersist()) {
+    if (mUnderStorageType.isSyncPersist()) {//同步写入，主动刷新数据到ufs
       mUnderStorageOutputStream.flush();
     }
   }
