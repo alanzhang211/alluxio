@@ -271,8 +271,8 @@ public final class AlluxioWorkerProcess implements WorkerProcess {
       if (mJvmPauseMonitor != null) {
         mJvmPauseMonitor.stop();
       }
-      stopWorkers();
     }
+    stopWorkers();
   }
 
   private boolean isServing() {
@@ -331,6 +331,8 @@ public final class AlluxioWorkerProcess implements WorkerProcess {
     return new WorkerNetAddress()
         .setHost(NetworkAddressUtils.getConnectHost(ServiceType.WORKER_RPC,
             ServerConfiguration.global()))
+        .setContainerHost(ServerConfiguration.global()
+            .getOrDefault(PropertyKey.WORKER_CONTAINER_HOSTNAME, ""))
         .setRpcPort(mRpcBindAddress.getPort())
         .setDataPort(getDataLocalPort())
         .setDomainSocketPath(getDataDomainSocketPath())

@@ -12,6 +12,7 @@
 package alluxio.job.plan.transform.format.parquet;
 
 import alluxio.AlluxioURI;
+import alluxio.job.plan.transform.format.JobPath;
 import alluxio.job.plan.transform.format.ReadWriterUtils;
 import alluxio.job.plan.transform.format.TableReader;
 import alluxio.job.plan.transform.format.TableRow;
@@ -38,14 +39,18 @@ import java.io.IOException;
 public final class ParquetReader implements TableReader {
   private final org.apache.parquet.hadoop.ParquetReader<Record> mReader;
   private final ParquetSchema mSchema;
+  private final ParquetMetadata mMetadata;
 
   /**
    * @param reader the Parquet reader
    * @param schema the schema
+   * @param metadata the Parquet metadata
    */
-  private ParquetReader(org.apache.parquet.hadoop.ParquetReader<Record> reader, Schema schema) {
+  private ParquetReader(org.apache.parquet.hadoop.ParquetReader<Record> reader, Schema schema,
+                        ParquetMetadata metadata) {
     mReader = reader;
     mSchema = new ParquetSchema(schema);
+    mMetadata = metadata;
   }
 
   /**
@@ -56,7 +61,7 @@ public final class ParquetReader implements TableReader {
    * @throws IOException when failed to create the reader
    */
   public static ParquetReader create(AlluxioURI uri) throws IOException {
-    Path inputPath = new Path(uri.getScheme(), uri.getAuthority().toString(), uri.getPath());
+    Path inputPath = new JobPath(uri.getScheme(), uri.getAuthority().toString(), uri.getPath());
     Configuration conf = ReadWriterUtils.readNoCacheConf();
     InputFile inputFile = HadoopInputFile.fromPath(inputPath, conf);
     org.apache.parquet.hadoop.ParquetReader<Record> reader =
@@ -67,18 +72,26 @@ public final class ParquetReader implements TableReader {
             .build();
 
     Schema schema;
+    ParquetMetadata footer;
     try (ParquetFileReader r = new ParquetFileReader(inputFile,
         ParquetReadOptions.builder().build())) {
-      ParquetMetadata footer = r.getFooter();
+      footer = r.getFooter();
       schema = new AvroSchemaConverter().convert(footer.getFileMetaData().getSchema());
     }
 
-    return new ParquetReader(reader, schema);
+    return new ParquetReader(reader, schema, footer);
   }
 
   @Override
   public TableSchema getSchema() throws IOException {
     return mSchema;
+  }
+
+  /**
+   * @return the Parquet metadata
+   */
+  public ParquetMetadata getMetadata() {
+    return mMetadata;
   }
 
   @Override

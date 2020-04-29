@@ -29,10 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -56,11 +52,11 @@ public class GrpcMessagingServer implements Server {
   /** Listen future. */
   private CompletableFuture<Void> mListenFuture;
 
-  /** List of all connections created by this server. */
-  private final List<Connection> mConnections;
-
   /** Executor for building server listener. */
   private final ExecutorService mExecutor;
+
+  /** Proxy configuration for server connections. */
+  private final GrpcMessagingProxy mProxy;
 
   /**
    * Creates a transport server that can be used to accept connections from remote clients.
@@ -68,13 +64,14 @@ public class GrpcMessagingServer implements Server {
    * @param conf Alluxio configuration
    * @param userState authentication user
    * @param executor transport executor
+   * @param proxy external proxy configuration
    */
   public GrpcMessagingServer(AlluxioConfiguration conf, UserState userState,
-      ExecutorService executor) {
+      ExecutorService executor, GrpcMessagingProxy proxy) {
     mConf = conf;
     mUserState = userState;
     mExecutor = executor;
-    mConnections = Collections.synchronizedList(new LinkedList<>());
+    mProxy = proxy;
   }
 
   @Override
@@ -85,23 +82,26 @@ public class GrpcMessagingServer implements Server {
       return mListenFuture;
     }
 
-    LOG.debug("Messaging server binding to: {}", address);
+    LOG.debug("Opening messaging server for: {}", address);
+
     final ThreadContext threadContext = ThreadContext.currentContextOrThrow();
     mListenFuture = CompletableFuture.runAsync(() -> {
-      // Listener that notifies both this server instance and given listener.
-      Consumer<Connection> forkListener = (connection) -> {
-        addNewConnection(connection);
-        listener.accept(connection);
-      };
+
+      Address bindAddress = address;
+      if (mProxy.hasProxyFor(address)) {
+        bindAddress = mProxy.getProxyFor(address);
+        LOG.debug("Found proxy: {} for address: {}", bindAddress, address);
+      }
+      LOG.debug("Binding messaging server to: {}", bindAddress);
 
       // Create gRPC server.
       mGrpcServer = GrpcServerBuilder
-          .forAddress(GrpcServerAddress.create(address.host(),
-              new InetSocketAddress(address.host(), address.port())), mConf, mUserState)
-          .maxInboundMessageSize((int) mConf
-              .getBytes(PropertyKey.MASTER_EMBEDDED_JOURNAL_TRANSPORT_MAX_INBOUND_MESSAGE_SIZE))
+          .forAddress(GrpcServerAddress.create(bindAddress.host(),
+              new InetSocketAddress(bindAddress.host(), bindAddress.port())), mConf, mUserState)
+          .maxInboundMessageSize((int) mConf.getBytes(
+              PropertyKey.MASTER_EMBEDDED_JOURNAL_TRANSPORT_MAX_INBOUND_MESSAGE_SIZE))
           .addService(new GrpcService(ServerInterceptors.intercept(
-              new GrpcMessagingServiceClientHandler(address, forkListener, threadContext,
+              new GrpcMessagingServiceClientHandler(address, listener::accept, threadContext,
                   mExecutor, mConf.getMs(PropertyKey.MASTER_EMBEDDED_JOURNAL_ELECTION_TIMEOUT)),
               new ClientIpAddressInjector())))
           .build();
@@ -109,10 +109,10 @@ public class GrpcMessagingServer implements Server {
       try {
         mGrpcServer.start();
 
-        LOG.info("Successfully started messaging server at: {}", address);
+        LOG.info("Successfully started messaging server at: {}", bindAddress);
       } catch (IOException e) {
         mGrpcServer = null;
-        LOG.debug("Failed to create messaging server for at: {}.", address, e);
+        LOG.debug("Failed to create messaging server for: {}.", address, e);
         throw new RuntimeException(e);
       }
     }, mExecutor);
@@ -127,40 +127,15 @@ public class GrpcMessagingServer implements Server {
     }
 
     LOG.debug("Closing messaging server: {}", mGrpcServer);
-    // Close created connections.
-    List<CompletableFuture<Void>> connectionCloseFutures = new ArrayList<>(mConnections.size());
-    for (Connection connection : mConnections) {
-      connectionCloseFutures.add(connection.close());
-    }
-    mConnections.clear();
 
-    CompletableFuture<Void> future = new CompletableFuture<>();
-    CompletableFuture.allOf(connectionCloseFutures.toArray(new CompletableFuture[0]))
-        .whenComplete((result, error) -> {
-          // Shut down gRPC server once all connections are closed.
-          try {
-            mGrpcServer.shutdown();
-          } catch (Exception e) {
-            LOG.warn("Failed to close messaging gRPC server: {}", mGrpcServer);
-          } finally {
-            mGrpcServer = null;
-          }
-          // Complete the future with result from connection shut downs.
-          if (error == null) {
-            future.complete(result);
-          } else {
-            future.completeExceptionally(error);
-          }
-        });
-    return future;
-  }
-
-  /**
-   * Used to keep track of all connections created by this server instance.
-   *
-   * @param serverConnection new client connection
-   */
-  private synchronized void addNewConnection(Connection serverConnection) {
-    mConnections.add(serverConnection);
+    return CompletableFuture.runAsync(() -> {
+      try {
+        mGrpcServer.shutdown();
+      } catch (Exception e) {
+        LOG.warn("Failed to close messaging gRPC server: {}", mGrpcServer);
+      } finally {
+        mGrpcServer = null;
+      }
+    });
   }
 }

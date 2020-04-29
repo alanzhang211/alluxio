@@ -22,6 +22,7 @@ import alluxio.job.plan.AbstractVoidPlanDefinition;
 import alluxio.job.RunTaskContext;
 import alluxio.job.SelectExecutorsContext;
 import alluxio.job.util.SerializableVoid;
+import alluxio.resource.CloseableResource;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.util.network.NetworkAddressUtils.ServiceType;
 import alluxio.wire.BlockInfo;
@@ -100,12 +101,10 @@ public final class EvictDefinition
   @Override
   public SerializableVoid runTask(EvictConfig config, SerializableVoid args, RunTaskContext context)
       throws Exception {
-    AlluxioBlockStore blockStore = AlluxioBlockStore.create(context.getFsContext());
-
     long blockId = config.getBlockId();
     String localHostName = NetworkAddressUtils.getConnectHost(ServiceType.WORKER_RPC,
         ServerConfiguration.global());
-    List<BlockWorkerInfo> workerInfoList = blockStore.getAllWorkers();
+    List<BlockWorkerInfo> workerInfoList = context.getFsContext().getCachedWorkers();
     WorkerNetAddress localNetAddress = null;
 
     for (BlockWorkerInfo workerInfo : workerInfoList) {
@@ -120,18 +119,13 @@ public final class EvictDefinition
     }
 
     RemoveBlockRequest request = RemoveBlockRequest.newBuilder().setBlockId(blockId).build();
-    BlockWorkerClient blockWorker = null;
-    try {
-      blockWorker = context.getFsContext().acquireBlockWorkerClient(localNetAddress);
-      blockWorker.removeBlock(request);
+    try (CloseableResource<BlockWorkerClient> blockWorker =
+             context.getFsContext().acquireBlockWorkerClient(localNetAddress)) {
+      blockWorker.get().removeBlock(request);
     } catch (NotFoundException e) {
       // Instead of throwing this exception, we continue here because the block to evict does not
       // exist on this worker anyway.
       LOG.warn("Failed to delete block {} on {}: block does not exist", blockId, localNetAddress);
-    } finally {
-      if (blockWorker != null) {
-        context.getFsContext().releaseBlockWorkerClient(localNetAddress, blockWorker);
-      }
     }
     return null;
   }

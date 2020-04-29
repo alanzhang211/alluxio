@@ -23,9 +23,10 @@ import alluxio.grpc.QuorumServerState;
 import alluxio.master.Master;
 import alluxio.master.PrimarySelector;
 import alluxio.master.journal.AbstractJournalSystem;
-import alluxio.master.journal.CatchupFuture;
 import alluxio.master.journal.AsyncJournalWriter;
+import alluxio.master.journal.CatchupFuture;
 import alluxio.master.journal.Journal;
+import alluxio.master.transport.GrpcMessagingProxy;
 import alluxio.master.transport.GrpcMessagingTransport;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.security.user.ServerUserState;
@@ -39,6 +40,7 @@ import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.copycat.client.CopycatClient;
 import io.atomix.copycat.client.RecoveryStrategies;
+import io.atomix.copycat.client.ServerSelectionStrategies;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.StateMachine;
 import io.atomix.copycat.server.cluster.Member;
@@ -66,8 +68,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -135,12 +135,6 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
   /// Lifecycle: constant from when the journal system is constructed.
 
   private final RaftJournalConfiguration mConf;
-  /**
-   * Whenever in-memory state may be inconsistent with the state represented by all flushed journal
-   * entries, a read lock on this lock must be held.
-   * We take a write lock when we want to perform a snapshot.
-   */
-  private final ReadWriteLock mJournalStateLock;
   /** Controls whether Copycat will attempt to take snapshots. */
   private final AtomicBoolean mSnapshotAllowed;
   /**
@@ -188,7 +182,6 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
     mConf = processRaftConfiguration(conf);
     mJournals = new ConcurrentHashMap<>();
     mSnapshotAllowed = new AtomicBoolean(true);
-    mJournalStateLock = new ReentrantReadWriteLock(true);
     mPrimarySelector = new RaftPrimarySelector();
     mAsyncJournalWriter = new AtomicReference<>();
   }
@@ -209,7 +202,7 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
     // if election timeout is not set explicitly.
     // This is to speed up single master cluster boot-up.
     if (conf.getClusterAddresses().size() == 1
-        && !ServerConfiguration.isSet(PropertyKey.MASTER_EMBEDDED_JOURNAL_ELECTION_TIMEOUT)) {
+        && !ServerConfiguration.isSetByUser(PropertyKey.MASTER_EMBEDDED_JOURNAL_ELECTION_TIMEOUT)) {
       LOG.debug("Overriding election timeout to {}ms for single master cluster.",
           SINGLE_MASTER_ELECTION_TIMEOUT_MS);
       conf.setElectionTimeoutMs(SINGLE_MASTER_ELECTION_TIMEOUT_MS);
@@ -237,6 +230,11 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
       mStateMachine.close();
     }
     mStateMachine = new JournalStateMachine(mJournals, () -> this.getJournalSinks(null));
+    // Read external proxy configuration.
+    GrpcMessagingProxy serverProxy = new GrpcMessagingProxy();
+    if (mConf.getProxyAddress() != null) {
+      serverProxy.addProxy(getLocalAddress(mConf), new Address(mConf.getProxyAddress()));
+    }
     mServer = CopycatServer.builder(getLocalAddress(mConf))
         .withStorage(storage)
         .withElectionTimeout(Duration.ofMillis(mConf.getElectionTimeoutMs()))
@@ -244,7 +242,8 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
         .withSnapshotAllowed(mSnapshotAllowed)
         .withSerializer(createSerializer())
         .withTransport(new GrpcMessagingTransport(
-            ServerConfiguration.global(), ServerUserState.global(), RAFTSERVER_CLIENT_TYPE))
+            ServerConfiguration.global(), ServerUserState.global(), RAFTSERVER_CLIENT_TYPE)
+                .withServerProxy(serverProxy))
         // Copycat wants a supplier that will generate *new* state machines. We can't handle
         // generating a new state machine here, so we will throw an exception if copycat tries to
         // call the supplier more than once.
@@ -274,6 +273,12 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
   private CopycatClient createClient() {
     return CopycatClient.builder(getClusterAddresses(mConf))
         .withRecoveryStrategy(RecoveryStrategies.RECOVER)
+        /*
+         * We use raft clients for journal writes and writes are only allowed on leader. Forcing
+         * client to connect to leader will improve performance by eliminating extra hops and will
+         * make transport level traces less confusing for investigation.
+         */
+        .withServerSelectionStrategy(ServerSelectionStrategies.LEADER)
         .withConnectionStrategy(attempt -> attempt.retry(Duration.ofMillis(
             Math.min(Math.round(100D * Math.pow(2D, (double) attempt.attempt())), 1000L))))
         .withTransport(new GrpcMessagingTransport(
@@ -301,8 +306,7 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
 
   @Override
   public synchronized Journal createJournal(Master master) {
-    RaftJournal journal = new RaftJournal(master, mConf.getPath().toURI(), mAsyncJournalWriter,
-        mJournalStateLock.readLock());
+    RaftJournal journal = new RaftJournal(master, mConf.getPath().toURI(), mAsyncJournalWriter);
     mJournals.put(master.getName(), journal);
     return journal;
   }
@@ -465,8 +469,8 @@ public final class RaftJournalSystem extends AbstractJournalSystem {
   private void waitForSnapshotting(JournalStateMachine stateMachine) throws IOException {
     try {
       CommonUtils.waitFor("snapshotting to finish", () -> !stateMachine.isSnapshotting(),
-          WaitForOptions.defaults().setTimeoutMs(Long.valueOf(ServerConfiguration.getMs(
-              PropertyKey.MASTER_EMBEDDED_JOURNAL_TRIGGERED_SNAPSHOT_WAIT_TIMEOUT)).intValue()));
+          WaitForOptions.defaults().setTimeoutMs((int) ServerConfiguration.getMs(
+              PropertyKey.MASTER_EMBEDDED_JOURNAL_TRIGGERED_SNAPSHOT_WAIT_TIMEOUT)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new CancelledException("Interrupted when waiting for snapshotting to finish", e);

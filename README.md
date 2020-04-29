@@ -28,13 +28,12 @@ the largest deployment exceeding 1300 nodes. You can find more use cases at
 ## Community and Events
 Please use the following to reach members of the community:
 
-* Slack: [alluxio-community channel](https://www.alluxio.io/slack)
+* [Alluxio Community Slack Channel](https://www.alluxio.io/slack)
 * Community Events: [upcoming online office hours, meetups and webinars](https://www.alluxio.io/events)
 * Meetup Groups: [Global Online Meetup](https://www.meetup.com/Alluxio-Global-Online-Meetup/), [Bay Area Meetup](http://www.meetup.com/Alluxio),
 [New York Meetup](https://www.meetup.com/Alluxio-Open-Source-New-York-Meetup),
 [Beijing Alluxio Meetup](https://www.meetup.com/meetup-group-iLMBZGhS/), [Austin Meetup](https://www.meetup.com/Cloud-Data-Orchestration-Austin/)
-* Twitter: [@alluxio](https://twitter.com/alluxio)
-* Mailing List: [alluxio-users](https://groups.google.com/forum/?fromgroups#!forum/alluxio-users)
+* [Alluxio Twitter](https://twitter.com/alluxio); [Alluxio Youtube Channel](https://www.youtube.com/channel/UCpibQsajhwqYPLYhke4RigA); [Alluxio Mailing List](https://groups.google.com/forum/?fromgroups#!forum/alluxio-users)
 
 ## Download Alluxio
 
@@ -103,13 +102,13 @@ Here are examples to declare the dependecies on  `alluxio-shaded-client` using M
   <dependency>
     <groupId>org.alluxio</groupId>
     <artifactId>alluxio-shaded-client</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.2</version>
   </dependency>
   ```
 
 - SBT
   ```
-  libraryDependencies += "org.alluxio" % "alluxio-shaded-client" % "2.1.0"
+  libraryDependencies += "org.alluxio" % "alluxio-shaded-client" % "2.1.2"
   ```
 
 ## Contributing

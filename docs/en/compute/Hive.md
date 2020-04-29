@@ -2,7 +2,7 @@
 layout: global
 title: Running Apache Hive with Alluxio
 nickname: Apache Hive
-group: Data Applications
+group: Compute Integrations
 priority: 2
 ---
 
@@ -18,7 +18,7 @@ that you can easily store Hive tables in Alluxio's tiered storage.
 * [Download and setup Hive](https://cwiki.apache.org/confluence/display/Hive/GettingStarted). If you are using Hive2.1+, 
   make sure to [run the schematool](https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.1)
   before starting Hive. `$HIVE_HOME/bin/schematool -dbType derby -initSchema`
-* Alluxio has been [set up and is running](https://docs.alluxio.io/os/user/2.0/en/deploy/Running-Alluxio-Locally.html).
+* Alluxio has been [set up and is running]({{ '/en/deploy/Running-Alluxio-Locally.html' | relativize_url }}).
 * Make sure that the Alluxio client jar is available.
   This Alluxio client jar file can be found at `{{site.ALLUXIO_CLIENT_JAR_PATH}}` in the tarball
   downloaded from Alluxio [download page](https://www.alluxio.io/download).
@@ -83,6 +83,7 @@ occupation STRING,
 zipcode STRING)
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY '|'
+STORED AS TEXTFILE
 LOCATION 'alluxio://master_hostname:port/ml-100k';
 ```
 
@@ -99,6 +100,7 @@ occupation STRING,
 zipcode STRING)
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY '|'
+STORED AS TEXTFILE
 LOCATION 'alluxio://master_hostname:port/ml-100k';
 ```
 
@@ -125,7 +127,7 @@ Alluxio can also serve them for Hive if HDFS is mounted as the under storage of 
 In this example, we assume a HDFS cluster is mounted as the under storage of
 Alluxio root directory (i.e., property `alluxio.master.mount.table.root.ufs=hdfs://namenode:port/`
 is set in `conf/alluxio-site.properties`). Please refer to
-[unified namespace]({{ '/en/advanced/Namespace-Management.html' | relativize_url }})
+[unified namespace]({{ '/en/core-services/Unified-Namespace.html' | relativize_url }})
 for more details about Alluxio `mount` operation.
 
 ### Move an Internal Table from HDFS to Alluxio
@@ -193,6 +195,16 @@ Instructions and examples till here illustrate how to use Alluxio as one of the 
 tables in Hive, together with other filesystems like HDFS. They do not require to change the global
 setting in Hive such as the default filesystem which is covered in the next section.
 
+### Move a Partitioned Table
+
+The process of moving a partitioned table is quite similar to moving a non-partitioned table, with one caveat.
+In addition to altering the table location, we also need to modify the partition location for all the partitions.
+See the following for an example.
+
+```
+hive> alter table TABLE_NAME partition(PARTITION_COLUMN = VALUE) set location 'hdfs://namenode:port/table/path/partitionpath";
+```
+
 ## Advanced Setup
 
 ### Customize Alluxio User Properties
@@ -245,7 +257,7 @@ Alternatively one can add the properties to the Hive `conf/hive-site.xml`:
 ```
 
 For information about how to connect to Alluxio HA cluster using Zookeeper-based leader election,
-please refer to [HA mode client configuration parameters]({{ '/en/deploy/Running-Alluxio-On-a-Cluster.html' | relativize_url }}#ha-configuration-parameters).
+please refer to [HA mode client configuration parameters]({{ '/en/deploy/Running-Alluxio-On-a-HA-Cluster.html' | relativize_url }}#specify-alluxio-service-in-configuration-parameters).
 
 If Hive is set up by adding the above HA mode configuration, one can write URIs using the "`alluxio://`" scheme:
 

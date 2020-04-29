@@ -14,7 +14,9 @@ package alluxio.master.table;
 import alluxio.grpc.table.ColumnStatisticsInfo;
 import alluxio.grpc.table.ColumnStatisticsList;
 import alluxio.grpc.table.Constraint;
+import alluxio.grpc.table.Database;
 import alluxio.grpc.table.Partition;
+import alluxio.grpc.table.SyncStatus;
 import alluxio.master.Master;
 import alluxio.master.table.transform.TransformJobInfo;
 
@@ -35,10 +37,12 @@ public interface TableMaster extends Master {
    * @param udbDbName the database name in the udb
    * @param dbName the database name in Alluxio
    * @param configuration the configuration
-   * @return true if creation is successful
+   * @param ignoreSyncErrors if true, will ignore sync errors during the attach
+   * @return the sync status for the attach
    */
-  boolean attachDatabase(String udbType, String udbConnectionUri, String udbDbName, String dbName,
-      Map<String, String> configuration) throws IOException;
+  SyncStatus attachDatabase(String udbType, String udbConnectionUri, String udbDbName,
+      String dbName, Map<String, String> configuration, boolean ignoreSyncErrors)
+      throws IOException;
 
   /**
    * Remove an existing database in the catalog.
@@ -64,6 +68,14 @@ public interface TableMaster extends Master {
    * @return a list of tables
    */
   List<String> getAllTables(String databaseName) throws IOException;
+
+  /**
+   * Gets a database object.
+   *
+   * @param dbName the database name
+   * @return a database object
+   */
+  Database getDatabase(String dbName) throws IOException;
 
   /**
    * Get a table.
@@ -135,7 +147,7 @@ public interface TableMaster extends Master {
    * Syncs a database.
    *
    * @param dbName the database name
-   * @return true if the database was changed as a result
+   * @return the resulting sync status
    */
-  boolean syncDatabase(String dbName) throws IOException;
+  SyncStatus syncDatabase(String dbName) throws IOException;
 }

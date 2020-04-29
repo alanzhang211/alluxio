@@ -72,9 +72,9 @@ export class MetricsPresenter extends React.Component<AllProps> {
               </tr>
               <tr>
                 <th>Local Alluxio (Short-circuit) Read</th>
-                <td>{'N/A'}</td>
+                <td>{data.totalBytesReadLocal}</td>
                 <th>Local Alluxio (Short-circuit) Write</th>
-                <td>{'N/A'}</td>
+                <td>{data.totalBytesWrittenLocal}</td>
               </tr>
               <tr>
                 <th>Remote Alluxio Read</th>
@@ -92,7 +92,7 @@ export class MetricsPresenter extends React.Component<AllProps> {
           </Table>
         </div>
         <div className="col-12">
-          <h5>Total IO Throughput (Last Minute)</h5>
+          <h5>Total IO Throughput (Per Minute)</h5>
           <Table hover={true}>
             <tbody>
               <tr>
@@ -103,9 +103,9 @@ export class MetricsPresenter extends React.Component<AllProps> {
               </tr>
               <tr>
                 <th>Local Alluxio (Short-circuit) Read</th>
-                <td>{'N/A'}</td>
+                <td>{data.totalBytesReadLocalThroughput}</td>
                 <th>Local Alluxio (Short-circuit) Write</th>
-                <td>{'N/A'}</td>
+                <td>{data.totalBytesWrittenLocalThroughput}</td>
               </tr>
               <tr>
                 <th>Remote Alluxio Read</th>

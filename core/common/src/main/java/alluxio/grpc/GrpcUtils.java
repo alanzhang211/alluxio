@@ -36,9 +36,11 @@ import alluxio.wire.WorkerInfo;
 import alluxio.wire.WorkerNetAddress;
 
 import com.google.common.net.HostAndPort;
+import com.google.protobuf.ByteString;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -228,7 +230,9 @@ public final class GrpcUtils {
         .setDefaultAcl(
             pInfo.hasDefaultAcl() ? ((DefaultAccessControlList) fromProto(pInfo.getDefaultAcl()))
                 : DefaultAccessControlList.EMPTY_DEFAULT_ACL)
-        .setReplicationMax(pInfo.getReplicationMax()).setReplicationMin(pInfo.getReplicationMin());
+        .setReplicationMax(pInfo.getReplicationMax()).setReplicationMin(pInfo.getReplicationMin())
+        .setXAttr(pInfo.getXattrMap().entrySet().stream().collect(Collectors.toMap(Map
+            .Entry::getKey, e -> e.getValue().toByteArray())));
     return fileInfo;
   }
 
@@ -308,6 +312,7 @@ public final class GrpcUtils {
   public static WorkerNetAddress fromProto(alluxio.grpc.WorkerNetAddress workerNetPAddress) {
     WorkerNetAddress workerNetAddress = new WorkerNetAddress();
     workerNetAddress.setHost(workerNetPAddress.getHost());
+    workerNetAddress.setContainerHost(workerNetPAddress.getContainerHost());
     workerNetAddress.setRpcPort(workerNetPAddress.getRpcPort());
     workerNetAddress.setDataPort(workerNetPAddress.getDataPort());
     workerNetAddress.setWebPort(workerNetPAddress.getWebPort());
@@ -466,6 +471,11 @@ public final class GrpcUtils {
     if (!fileInfo.getDefaultAcl().equals(DefaultAccessControlList.EMPTY_DEFAULT_ACL)) {
       builder.setDefaultAcl(toProto(fileInfo.getDefaultAcl()));
     }
+    if (fileInfo.getXAttr() != null) {
+      for (Map.Entry<String, byte[]> entry : fileInfo.getXAttr().entrySet()) {
+        builder.putXattr(entry.getKey(), ByteString.copyFrom(entry.getValue()));
+      }
+    }
     return builder.build();
   }
 
@@ -573,8 +583,11 @@ public final class GrpcUtils {
    */
   public static alluxio.grpc.WorkerNetAddress toProto(WorkerNetAddress workerNetAddress) {
     alluxio.grpc.WorkerNetAddress.Builder address = alluxio.grpc.WorkerNetAddress.newBuilder()
-        .setHost(workerNetAddress.getHost()).setRpcPort(workerNetAddress.getRpcPort())
-        .setDataPort(workerNetAddress.getDataPort()).setWebPort(workerNetAddress.getWebPort())
+        .setHost(workerNetAddress.getHost())
+        .setContainerHost(workerNetAddress.getContainerHost())
+        .setRpcPort(workerNetAddress.getRpcPort())
+        .setDataPort(workerNetAddress.getDataPort())
+        .setWebPort(workerNetAddress.getWebPort())
         .setDomainSocketPath(workerNetAddress.getDomainSocketPath());
     if (workerNetAddress.getTieredIdentity() != null) {
       address.setTieredIdentity(toProto(workerNetAddress.getTieredIdentity()));

@@ -3,7 +3,7 @@ layout: global
 title: Troubleshooting
 nickname: Troubleshooting
 group: Operations
-priority: 0
+priority: 14
 ---
 
 * Table of Contents
@@ -30,8 +30,10 @@ in the case the problem has been discussed before.
 
 The client-side logs are also helpful when Alluxio service is running but the client cannot connect to the servers.
 Alluxio client emits logging messages through log4j, so the location of the logs is determined by the client side
-log4j configuration used by the application. For more information about logging, please check out
-[this page]({{ '/en/advanced/Client-Logging.html' | relativize_url }}).
+log4j configuration used by the application.
+
+For more information about logging, please check out
+[this page]({{ '/en/operation/Basic-Logging.html' | relativize_url }}).
 
 ## Alluxio remote debug
 
@@ -55,6 +57,82 @@ After starting the master or worker, use Eclipse, IntelliJ IDEA, or another java
 set the debug server's host and port, and start the debug session. If you set a breakpoint which can be reached, the IDE
 will enter debug mode and you can inspect the current context's variables, call stack, thread list, and expression
 evaluation.
+
+## Alluxio collectInfo command
+
+Alluxio has a `collectInfo` command that collect information to troubleshoot an Alluxio cluster.
+`collectInfo` will run a set of sub-commands that each collects one aspect of system information, as explained below.
+In the end the collected information will be bundled into one tarball which contains a lot of information regarding your Alluxio cluster.
+The tarball size mostly depends on your cluster size and how much information you are collecting.
+For example, `collectLog` operation can be costly if you have huge amounts of logs. Other commands
+typically do not generate files larger than 1MB. The tarball will help you troubleshoot your cluster.
+Or you can shared the tarball with someone you trust to help troubleshoot your Alluxio cluster.
+
+The `collectInfo` command will SSH to each node and execute the set of sub-commands.
+In the end of execution the collected information will be written to files and tarballed.
+Each individual tarball will be collected to the issuing node.
+Then all the tarballs will be bundled into the final tarball, which contains all information about the Alluxio cluster.
+
+>NOTE: Be careful if your configuration contains credentials like AWS keys!
+You should ALWAYS CHECK what is in the tarball and REMOVE the sensitive information from the tarball before sharing it with someone!
+
+### Collect Alluxio cluster information
+`collectAlluxioInfo` will run a set of Alluxio commands that collect information about the Alluxio cluster, like `bin/alluxio fsadmin report` etc.
+When the Alluxio cluster is not running, this command will fail to collect some information.
+> NOTE: The configuration parameters will be collected with `alluxio getConf --master`, which obfuscates the credential fields passed to
+Alluxio as properties.
+
+### Collect Alluxio configuration files
+`collectConfig` will collect all the configuration files under `${alluxio.work.dir}/conf`.
+> WARNING: If you put credential fields in the configuration files, DO NOT share the collected tarball with anybody unless
+you have manually obfuscated them in the tarball!
+
+### Collect Alluxio logs
+`collectLog` will collect all the logs under `${alluxio.work.dir}/logs`.
+> NOTE: Roughly estimate how much log you are collecting before executing this command!
+
+### Collect Alluxio metrics
+`collectMetrics` will collect Alluxio metrics served at `http://${alluxio.master.hostname}:${alluxio.master.web.port}/metrics/json/` by default.
+The metrics will be collected multiple times to see the progress.
+
+### Collect JVM information
+`collectJvmInfo` will collect information about the existing JVMs on each node.
+This is done by running a `jps` command then `jstack` on each found JVM process.
+This will be done multiple times to see if the JVMs are making progress.
+
+### Collect system information
+`collectEnv` will run a set of bash commands to collect information about the running node.
+This runs system troubleshooting commands like `env`, `hostname`, `top`, `ps` etc.
+> WARNING: If you stored credential fields in environment variables like AWS_ACCESS_KEY or in process start parameters
+like -Daws.access.key=XXX, DO NOT share the collected tarball with anybody unless you have manually obfuscated them in the tarball!
+
+### Collect all information mentioned above
+`all` will run all the sub-commands above.
+
+### Command options
+
+The `collectInfo` command has the below options.
+
+```console
+$ bin/alluxio collectInfo [--local] [--max-threads threadNum]
+    [all <outputPath>]
+    [collectAlluxioInfo <outputPath>]
+    [collectConfig <outputPath>]
+    [collectEnv <outputPath>]
+    [collectJvmInfo <outputPath>]
+    [collectLogs <outputPath>]
+    [collectMetrics <outputPath>]
+```
+
+`<outputPath>` is the directory you want the final tarball to be written into.
+
+Options:
+1. `--local` option specifies the `collectInfo` command to run only on `localhost`.
+That means the command will only collect information about the `localhost`.
+
+1. `--max-threads threadNum` option configures how many threads to use for concurrently collecting information and transmitting tarballs.
+When the cluster has a large number of nodes, or large log files, the network IO for transmitting tarballs can be significant.
+Use this parameter to constrain the resource usage of this command.
 
 ## Setup FAQ
 
@@ -156,17 +234,17 @@ A: This problem can be caused by different possible reasons.
 - Please double check if the port of Alluxio master address is correct. The default listening port for Alluxio master is port 19998,
 while a common mistake causing this error message is due to using a wrong port in master address (e.g., using port 19999 which is the default Web UI port for Alluxio master).
 - Please ensure that the security settings of Alluxio client and master are consistent.
-Alluxio provides different approaches to [authenticate]({{ '/en/advanced/Security.html' | relativize_url }}#authentication) users by configuring `alluxio.security.authentication.type`.
+Alluxio provides different approaches to [authenticate]({{ '/en/operation/Security.html' | relativize_url }}#authentication) users by configuring `alluxio.security.authentication.type`.
 This error happens if this property is configured with different values across servers and clients
 (e.g., one uses the default value `NOSASL` while the other is customized to `SIMPLE`).
-Please read [Configuration-Settings]({{ '/en/basic/Configuration-Settings.html' | relativize_url }}) for how to customize Alluxio clusters and applications.
+Please read [Configuration-Settings]({{ '/en/operation/Configuration.html' | relativize_url }}) for how to customize Alluxio clusters and applications.
 
 ### Q: I'm copying or writing data to Alluxio while seeing error messages like "Failed to cache: Not enough space to store block on worker". Why?
 
 A: This error indicates insufficient space left on Alluxio workers to complete your write request.
 
 - Check if you have any files unnecessarily pinned in memory and unpin them to release space.
-See [Command-Line-Interface]({{ '/en/basic/Command-Line-Interface.html' | relativize_url }}) for more details.
+See [Command-Line-Interface]({{ '/en/operation/User-CLI.html' | relativize_url }}) for more details.
 - Increase the capacity of workers by changing `alluxio.worker.memory.size` property.
 See [Configuration]({{ '/en/reference/Properties-List.html' | relativize_url }}#common-configuration) for more description.
 
@@ -186,8 +264,8 @@ To reveal new files from under file system, you can use the command
 `alluxio fs ls -R -Dalluxio.user.file.metadata.sync.interval=${SOME_INTERVAL} /path` or by setting the same
 configuration property in masters' `alluxio-site.properties`.
 The value for the configuration property is used to determine the minimum interval between two syncs.
-You can read more about loading files from underfile system 
-[here]({{ '/en/advanced/Namespace-Management.html' | relativize_url }}#ufs-metadata-sync).
+You can read more about loading files from underfile system
+[here]({{ '/en/core-services/Unified-Namespace.html' | relativize_url }}#ufs-metadata-sync).
 
 ### Q: I see an error "Block ?????? is unavailable in both Alluxio and UFS" while reading some file. Where is my file?
 
@@ -223,7 +301,7 @@ node by default).
 A: Alluxio accelerates your system performance by leveraging temporal or spatial locality using distributed in-memory storage
 (and tiered storage). If your workloads don't have any locality, you will not see noticeable performance boost.
 
-**For a comprehensive guide on tuning performance of Alluxio cluster, please check out [this page]({{ '/en/advanced/Performance-Tuning.html' | relativize_url }}).**
+**For a comprehensive guide on tuning performance of Alluxio cluster, please check out [this page]({{ '/en/operation/Performance-Tuning.html' | relativize_url }}).**
 
 ## Environment
 

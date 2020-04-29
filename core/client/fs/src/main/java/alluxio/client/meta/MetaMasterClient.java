@@ -11,24 +11,21 @@
 
 package alluxio.client.meta;
 
-import alluxio.exception.status.AlluxioStatusException;
+import alluxio.Client;
 import alluxio.grpc.BackupPRequest;
 import alluxio.grpc.MasterInfo;
 import alluxio.grpc.MasterInfoField;
-import alluxio.grpc.MetricValue;
 import alluxio.wire.BackupStatus;
 import alluxio.wire.ConfigCheckReport;
 
-import java.io.Closeable;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * Interface for a meta master client.
  */
-public interface MetaMasterClient extends Closeable {
+public interface MetaMasterClient extends Client {
 
   /**
    * Takes a backup.
@@ -67,13 +64,6 @@ public interface MetaMasterClient extends Closeable {
    * @return the requested master info
    */
   MasterInfo getMasterInfo(Set<MasterInfoField> masterInfoFields) throws IOException;
-
-  /**
-   * Gets a map of metrics property names and their values from metrics system.
-   *
-   * @return a map of metrics information
-   */
-  Map<String, MetricValue> getMetrics() throws AlluxioStatusException;
 
   /**
    * Creates a checkpoint in the primary master journal system.

@@ -42,6 +42,10 @@ public class HiveConstants {
    */
   public static final String CSV_SERDE_CLASS = "org.apache.hadoop.hive.serde2.OpenCSVSerde";
   /**
+   * ORC serde class.
+   */
+  public static final String ORC_SERDE_CLASS = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
+  /**
    * Text input format.
    */
   public static final String TEXT_INPUT_FORMAT_CLASS = "org.apache.hadoop.mapred.TextInputFormat";
@@ -97,5 +101,21 @@ public class HiveConstants {
     public static final String DECIMAL = "decimal";
     /** Hive binary type. */
     public static final String BINARY = "binary";
+
+    /**
+     * Filters out parts of type information to match the types constant for type checking.
+     *
+     * @param type the type
+     * @return type name matching the types constants
+     */
+    public static String getHiveConstantType(String type) {
+      // filters out the non hive type information from types like "char(10)"
+
+      int i = type.indexOf('(');
+      if (i == -1) {
+        return type;
+      }
+      return type.substring(0, i);
+    }
   }
 }

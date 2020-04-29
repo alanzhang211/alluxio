@@ -20,6 +20,8 @@ import alluxio.grpc.table.GetAllDatabasesPRequest;
 import alluxio.grpc.table.GetAllDatabasesPResponse;
 import alluxio.grpc.table.GetAllTablesPRequest;
 import alluxio.grpc.table.GetAllTablesPResponse;
+import alluxio.grpc.table.GetDatabasePRequest;
+import alluxio.grpc.table.GetDatabasePResponse;
 import alluxio.grpc.table.GetPartitionColumnStatisticsPRequest;
 import alluxio.grpc.table.GetPartitionColumnStatisticsPResponse;
 import alluxio.grpc.table.GetTableColumnStatisticsPRequest;
@@ -32,6 +34,7 @@ import alluxio.grpc.table.ReadTablePRequest;
 import alluxio.grpc.table.ReadTablePResponse;
 import alluxio.grpc.table.SyncDatabasePRequest;
 import alluxio.grpc.table.SyncDatabasePResponse;
+import alluxio.grpc.table.SyncStatus;
 import alluxio.grpc.table.TableMasterClientServiceGrpc;
 import alluxio.grpc.table.TransformTablePRequest;
 import alluxio.grpc.table.TransformTablePResponse;
@@ -66,11 +69,14 @@ public class TableMasterClientServiceHandler
   @Override
   public void attachDatabase(AttachDatabasePRequest request,
       StreamObserver<AttachDatabasePResponse> responseObserver) {
-    RpcUtils.call(LOG, () -> AttachDatabasePResponse.newBuilder().setSuccess(mTableMaster
-            .attachDatabase(request.getUdbType(), request.getUdbConnectionUri(),
-                request.getUdbDbName(),
-                request.getDbName(), request.getOptionsMap())).build(), "attachDatabase", "",
-        responseObserver);
+    RpcUtils.call(LOG, () -> {
+      SyncStatus status = mTableMaster
+          .attachDatabase(request.getUdbType(), request.getUdbConnectionUri(),
+              request.getUdbDbName(), request.getDbName(), request.getOptionsMap(),
+              request.getIgnoreSyncErrors());
+      return AttachDatabasePResponse.newBuilder().setSuccess(status.getTablesErrorsCount() == 0)
+          .setSyncStatus(status).build();
+    }, "attachDatabase", "", responseObserver);
   }
 
   @Override
@@ -95,6 +101,14 @@ public class TableMasterClientServiceHandler
     RpcUtils.call(LOG, () -> GetAllTablesPResponse.newBuilder()
         .addAllTable(mTableMaster.getAllTables(request.getDatabase())).build(),
         "getAllTables", "", responseObserver);
+  }
+
+  @Override
+  public void getDatabase(GetDatabasePRequest request,
+      StreamObserver<GetDatabasePResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> GetDatabasePResponse.newBuilder().setDb(
+        mTableMaster.getDatabase(request.getDbName())).build(),
+        "getDatabase", "", responseObserver);
   }
 
   @Override
@@ -147,9 +161,11 @@ public class TableMasterClientServiceHandler
   @Override
   public void syncDatabase(SyncDatabasePRequest request,
       StreamObserver<SyncDatabasePResponse> responseObserver) {
-    RpcUtils.call(LOG, () -> SyncDatabasePResponse.newBuilder().setSuccess(mTableMaster
-        .syncDatabase(request.getDbName()))
-        .build(), "syncDatabase", "", responseObserver);
+    RpcUtils.call(LOG, () -> {
+      SyncStatus status = mTableMaster.syncDatabase(request.getDbName());
+      return SyncDatabasePResponse.newBuilder().setSuccess(status.getTablesErrorsCount() == 0)
+          .setStatus(status).build();
+    }, "syncDatabase", "", responseObserver);
   }
 
   @Override

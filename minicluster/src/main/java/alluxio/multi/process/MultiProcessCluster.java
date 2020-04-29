@@ -27,6 +27,8 @@ import alluxio.client.journal.JournalMasterClient;
 import alluxio.client.journal.RetryHandlingJournalMasterClient;
 import alluxio.client.meta.MetaMasterClient;
 import alluxio.client.meta.RetryHandlingMetaMasterClient;
+import alluxio.client.metrics.MetricsMasterClient;
+import alluxio.client.metrics.RetryHandlingMetricsMasterClient;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.Source;
@@ -237,9 +239,9 @@ public final class MultiProcessCluster {
     for (int i = 0; i < mNumWorkers; i++) {
       createWorker(i).start();
     }
-    System.out.printf("Starting alluxio cluster in directory %s%n", mWorkDir.getAbsolutePath());
+    LOG.info("Starting alluxio cluster in directory {}", mWorkDir.getAbsolutePath());
     int primaryMasterIndex = getPrimaryMasterIndex(WAIT_MASTER_SERVING_TIMEOUT_MS);
-    System.out.printf("Alluxio primary master %s starts serving RPCs%n",
+    LOG.info("Alluxio primary master {} starts serving RPCs",
         mMasterAddresses.get(primaryMasterIndex));
   }
 
@@ -360,6 +362,18 @@ public final class MultiProcessCluster {
     Preconditions.checkState(mState == State.STARTED,
         "must be in the started state to create a meta master client, but state was %s", mState);
     return new RetryHandlingMetaMasterClient(MasterClientContext
+        .newBuilder(ClientContext.create(ServerConfiguration.global()))
+        .setMasterInquireClient(getMasterInquireClient())
+        .build());
+  }
+
+  /**
+   * @return a metrics master client
+   */
+  public synchronized MetricsMasterClient getMetricsMasterClient() {
+    Preconditions.checkState(mState == State.STARTED,
+        "must be in the started state to create a metrics master client, but state was %s", mState);
+    return new RetryHandlingMetricsMasterClient(MasterClientContext
         .newBuilder(ClientContext.create(ServerConfiguration.global()))
         .setMasterInquireClient(getMasterInquireClient())
         .build());

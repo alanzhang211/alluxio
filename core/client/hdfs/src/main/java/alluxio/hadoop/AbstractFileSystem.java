@@ -41,7 +41,6 @@ import alluxio.wire.FileBlockInfo;
 import alluxio.wire.WorkerNetAddress;
 
 import com.google.common.net.HostAndPort;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -77,11 +76,12 @@ import javax.security.auth.Subject;
  * used and {@link #getScheme()} for Hadoop's {@link java.util.ServiceLoader} support.
  */
 @NotThreadSafe
-abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
+public abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractFileSystem.class);
 
   public static final String FIRST_COM_PATH = "alluxio_dep/";
 
+  protected AlluxioConfiguration mAlluxioConf = null;
   protected FileSystem mFileSystem = null;
 
   private URI mUri = null;
@@ -95,15 +95,14 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
    *
    * @param fileSystem handler to file system
    */
-  @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
-  AbstractFileSystem(FileSystem fileSystem) {
+  protected AbstractFileSystem(FileSystem fileSystem) {
     mFileSystem = fileSystem;
   }
 
   /**
    * Constructs a new {@link AbstractFileSystem} instance.
    */
-  AbstractFileSystem() {}
+  protected AbstractFileSystem() {}
 
   @Override
   public FSDataOutputStream append(Path path, int bufferSize, Progressable progress)
@@ -260,10 +259,11 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
   @Override
   public BlockLocation[] getFileBlockLocations(FileStatus file, long start, long len)
       throws IOException {
-    LOG.debug("getFileBlockLocations({}, {}, {})", file.getPath().getName(), start, len);
+    LOG.debug("getFileBlockLocations({}, {}, {})",
+        (file == null) ? null : file.getPath().getName(), start, len);
     if (file == null) {
       LOG.debug("getFileBlockLocations({}, {}, {}) returned null",
-          file.getPath().getName(), start, len);
+          null, start, len);
       return null;
     }
     if (mStatistics != null) {
@@ -471,16 +471,18 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
     mStatistics = statistics;
     mUri = URI.create(mAlluxioHeader);
 
-    if (mFileSystem != null) {
-      return;
-    }
-
     Map<String, Object> uriConfProperties = getConfigurationFromUri(uri);
 
     AlluxioProperties alluxioProps =
         (alluxioConfiguration != null) ? alluxioConfiguration.copyProperties()
             : ConfigurationUtils.defaults();
     AlluxioConfiguration alluxioConf = mergeConfigurations(uriConfProperties, conf, alluxioProps);
+    mAlluxioConf = alluxioConf;
+
+    if (mFileSystem != null) {
+      return;
+    }
+
     Subject subject = getHadoopSubject();
     LOG.debug("Using Hadoop subject: {}", subject);
 
@@ -490,7 +492,7 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
     // Create FileSystem for accessing Alluxio.
     // Disable URI validation for non-Alluxio schemes.
     boolean disableUriValidation =
-        (uri.getScheme() != null) ? uri.getScheme().equals(Constants.SCHEME) : true;
+        (uri.getScheme() == null) || uri.getScheme().equals(Constants.SCHEME);
     mFileSystem = FileSystem.Factory.create(
         ClientContext.create(subject, alluxioConf).setUriValidationEnabled(disableUriValidation));
   }

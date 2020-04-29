@@ -26,6 +26,7 @@ import alluxio.job.util.JobTestUtils;
 import alluxio.job.wire.JobWorkerHealth;
 import alluxio.job.wire.JobInfo;
 import alluxio.job.wire.Status;
+import alluxio.job.workflow.composite.CompositeConfig;
 import alluxio.master.LocalAlluxioJobCluster;
 import alluxio.master.job.JobMaster;
 import alluxio.testutils.BaseIntegrationTest;
@@ -35,6 +36,8 @@ import alluxio.util.WaitForOptions;
 import alluxio.wire.WorkerInfo;
 import alluxio.worker.JobWorkerProcess;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -191,7 +194,11 @@ public final class JobMasterIntegrationTest extends BaseIntegrationTest {
     mJobMaster.setTaskPoolSize(1);
 
     long jobId0 = mJobMaster.run(new SleepJobConfig(1));
-    long jobId1 = mJobMaster.run(new SleepJobConfig(5000));
+    JobTestUtils.waitForJobStatus(mJobMaster, jobId0,
+        Sets.newHashSet(Status.RUNNING, Status.COMPLETED));
+
+    long jobId1 = mJobMaster.run(new SleepJobConfig(50000));
+    JobTestUtils.waitForJobStatus(mJobMaster, jobId1, Status.RUNNING);
     JobTestUtils.waitForJobStatus(mJobMaster, jobId0, Status.COMPLETED);
 
     long jobId2 = mJobMaster.run(new SleepJobConfig(1));
@@ -200,11 +207,47 @@ public final class JobMasterIntegrationTest extends BaseIntegrationTest {
     // wait a bit more to make sure other jobs aren't completing
     CommonUtils.sleepMs(300);
 
-    assertFalse(mJobMaster.getStatus(jobId1).getStatus().isFinished());
-    assertFalse(mJobMaster.getStatus(jobId2).getStatus().isFinished());
-    assertFalse(mJobMaster.getStatus(jobId3).getStatus().isFinished());
+    assertEquals(Status.RUNNING, mJobMaster.getStatus(jobId1).getStatus());
+    assertEquals(Status.CREATED, mJobMaster.getStatus(jobId2).getStatus());
+    assertEquals(Status.CREATED, mJobMaster.getStatus(jobId3).getStatus());
 
     assertEquals(1, mJobMaster.getAllWorkerHealth().get(0).getTaskPoolSize());
     assertEquals(1, mJobMaster.getAllWorkerHealth().get(0).getNumActiveTasks());
+
+    mJobMaster.cancel(jobId1);
+
+    JobTestUtils.waitForJobStatus(mJobMaster, jobId2, Status.COMPLETED);
+    JobTestUtils.waitForJobStatus(mJobMaster, jobId3, Status.COMPLETED);
+  }
+
+  @Test
+  public void cancel() throws Exception {
+    SleepJobConfig childJob1 = new SleepJobConfig(50000);
+    SleepJobConfig childJob2 = new SleepJobConfig(45000);
+    SleepJobConfig childJob3 = new SleepJobConfig(40000);
+
+    CompositeConfig jobConfig = new CompositeConfig(
+        Lists.newArrayList(childJob1, childJob2, childJob3), false);
+
+    long jobId = mJobMaster.run(jobConfig);
+
+    JobInfo status = mJobMaster.getStatus(jobId);
+    List<JobInfo> children = status.getChildren();
+
+    assertEquals(3, children.size());
+
+    long child0 = children.get(0).getId();
+    long child1 = children.get(1).getId();
+    long child2 = children.get(2).getId();
+
+    mJobMaster.cancel(child0);
+    JobTestUtils.waitForJobStatus(mJobMaster, child0, Status.CANCELED);
+    JobTestUtils.waitForJobStatus(mJobMaster, jobId, Status.CANCELED);
+    JobTestUtils.waitForJobStatus(mJobMaster, child1, Status.RUNNING);
+    JobTestUtils.waitForJobStatus(mJobMaster, child2, Status.RUNNING);
+
+    mJobMaster.cancel(jobId);
+    JobTestUtils.waitForJobStatus(mJobMaster, child1, Status.CANCELED);
+    JobTestUtils.waitForJobStatus(mJobMaster, child2, Status.CANCELED);
   }
 }

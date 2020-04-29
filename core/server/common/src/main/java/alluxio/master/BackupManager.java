@@ -16,13 +16,11 @@ import alluxio.conf.ServerConfiguration;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.journal.JournalEntryAssociation;
 import alluxio.master.journal.JournalEntryStreamReader;
-import alluxio.metrics.MasterMetrics;
+import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.util.ThreadFactoryUtils;
 
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.Timer;
 import com.google.common.collect.Maps;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
@@ -74,11 +72,25 @@ public class BackupManager {
 
   private final MasterRegistry mRegistry;
 
+  // Set initial values to -1 to indicate no backup or restore happened
+  private long mBackupEntriesCount = -1;
+  private long mRestoreEntriesCount = -1;
+  private long mBackupTimeMs = -1;
+  private long mRestoreTimeMs = -1;
+
   /**
    * @param registry a master registry containing the masters to backup or restore
    */
   public BackupManager(MasterRegistry registry) {
     mRegistry = registry;
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_LAST_BACKUP_ENTRIES_COUNT.getName(),
+        () -> mBackupEntriesCount);
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_LAST_BACKUP_RESTORE_COUNT.getName(),
+        () -> mRestoreEntriesCount);
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_LAST_BACKUP_RESTORE_TIME_MS.getName(),
+        () -> mRestoreTimeMs);
+    MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_LAST_BACKUP_TIME_MS.getName(),
+        () -> mBackupTimeMs);
   }
 
   /**
@@ -109,9 +121,8 @@ public class BackupManager {
     // Whether buffering is still active.
     AtomicBoolean bufferingActive = new AtomicBoolean(true);
 
-    // Start the timer for backup metrics and reset the entry counter.
-    Metrics.LAST_BACKUP_ENTRIES_COUNT.dec(Metrics.LAST_BACKUP_ENTRIES_COUNT.getCount());
-    Timer.Context backup = Metrics.BACKUP_ENTRIES_PROCESS_TIME.time();
+    // Start the timer for backup metrics.
+    long startBackupTime = System.currentTimeMillis();
 
     // Submit master reader task.
     activeTasks.add(completionService.submit(() -> {
@@ -169,8 +180,8 @@ public class BackupManager {
     safeWaitTasks(activeTasks, completionService);
 
     // Close timer and update entry count.
-    backup.close();
-    Metrics.LAST_BACKUP_ENTRIES_COUNT.inc(entryCount.get());
+    mBackupTimeMs = System.currentTimeMillis() - startBackupTime;
+    mBackupEntriesCount = entryCount.get();
 
     // finish() instead of close() since close would close os, which is owned by the caller.
     zipStream.finish();
@@ -214,9 +225,8 @@ public class BackupManager {
         LOG.info("{} entries from backup applied so far...", appliedEntryCount.get());
       }, 30, 30, TimeUnit.SECONDS);
 
-      // Start the timer for backup metrics and reset restore entry count.
-      Metrics.LAST_BACKUP_RESTORE_COUNT.dec(Metrics.LAST_BACKUP_RESTORE_COUNT.getCount());
-      Timer.Context restore = Metrics.BACKUP_RESTORE_PROCESS_TIME.time();
+      // Start the timer for backup metrics.
+      long startRestoreTime = System.currentTimeMillis();
 
       // Create backup reader task.
       activeTasks.add(completionService.submit(() -> {
@@ -296,8 +306,8 @@ public class BackupManager {
       try {
         safeWaitTasks(activeTasks, completionService);
       } finally {
-        restore.close();
-        Metrics.LAST_BACKUP_RESTORE_COUNT.inc(appliedEntryCount.get());
+        mRestoreTimeMs = System.currentTimeMillis() - startRestoreTime;
+        mRestoreEntriesCount = appliedEntryCount.get();
         traceExecutor.shutdownNow();
       }
 
@@ -338,24 +348,5 @@ public class BackupManager {
         }
       }
     }
-  }
-
-  /**
-   * Class that contains metrics for BackupManager.
-   * This class is public because the counter names are referenced in
-   * {@link alluxio.web.WebInterfaceAbstractMetricsServlet}.
-   */
-  public static final class Metrics {
-    private static final Timer BACKUP_ENTRIES_PROCESS_TIME
-        = MetricsSystem.timer(MasterMetrics.BACKUP_ENTRIES_PROCESS_TIME);
-    private static final Timer BACKUP_RESTORE_PROCESS_TIME
-        = MetricsSystem.timer(MasterMetrics.BACKUP_RESTORE_PROCESS_TIME);
-    private static final Counter LAST_BACKUP_ENTRIES_COUNT
-        = MetricsSystem.counter(MasterMetrics.LAST_BACKUP_ENTRIES_COUNT);
-    private static final Counter LAST_BACKUP_RESTORE_COUNT
-        = MetricsSystem.counter(MasterMetrics.LAST_BACKUP_RESTORE_COUNT);
-
-    private Metrics() {
-    } // prevent instantiation
   }
 }

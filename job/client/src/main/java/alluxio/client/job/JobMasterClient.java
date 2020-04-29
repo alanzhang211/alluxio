@@ -60,6 +60,14 @@ public interface JobMasterClient extends Client {
   JobInfo getJobStatus(long id) throws IOException;
 
   /**
+   * Gets detailed status of the given job id.
+   *
+   * @param id the job id
+   * @return the detailed job information
+   */
+  JobInfo getJobStatusDetailed(long id) throws IOException;
+
+  /**
    * Gets the job service summary.
    *
    * @return the job service summary
@@ -70,6 +78,11 @@ public interface JobMasterClient extends Client {
    * @return the list of ids of all jobs
    */
   List<Long> list() throws IOException;
+
+  /**
+   * @return the list of all jobInfos
+   */
+  List<JobInfo> listDetailed() throws IOException;
 
   /**
    * Starts a plan based on the given configuration.

@@ -23,7 +23,7 @@ import { initialState } from './store';
 
 import 'source-sans-pro/source-sans-pro.css';
 import 'source-serif-pro/source-serif-pro.css';
-import 'source-code-pro/source-code-pro.css';
+import '@openfonts/anonymous-pro_all';
 
 import './index.css';
 import { IAppProps } from './containers/App/App';
@@ -37,7 +37,8 @@ history.listen((loc: Location, action: Action) => {
   }
 
   // Allow the client to control scroll-to-top using location.state
-  if (loc.state && loc.state.scroll !== undefined && !loc.state.scroll) {
+  const l = (loc as unknown) as { state: { scroll: boolean } };
+  if (l.state && l.state.scroll !== undefined && !l.state.scroll) {
     return;
   }
 

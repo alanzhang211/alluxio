@@ -265,13 +265,16 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
   public void cancel(long jobId) throws JobDoesNotExistException {
     PlanCoordinator planCoordinator = mPlanTracker.getCoordinator(jobId);
     if (planCoordinator == null) {
-      throw new JobDoesNotExistException(ExceptionMessage.JOB_DOES_NOT_EXIST.getMessage(jobId));
+      if (!mWorkflowTracker.cancel(jobId)) {
+        throw new JobDoesNotExistException(ExceptionMessage.JOB_DOES_NOT_EXIST.getMessage(jobId));
+      }
+      return;
     }
     planCoordinator.cancel();
   }
 
   /**
-   * @return list all the job ids
+   * @return list of all job ids
    */
   public List<Long> list() {
     ArrayList<Long> allIds = Lists.newArrayList(mPlanTracker.list());
@@ -281,24 +284,53 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
   }
 
   /**
-   * Gets information of the given job id.
+   * @return list of all job infos
+   */
+  public List<JobInfo> listDetailed() {
+    List<JobInfo> jobInfos = new ArrayList<>();
+
+    for (PlanCoordinator coordinator : mPlanTracker.coordinators()) {
+      jobInfos.add(coordinator.getPlanInfoWire(false));
+    }
+
+    jobInfos.addAll(mWorkflowTracker.getAllInfo());
+
+    jobInfos.sort(Comparator.comparingLong(JobInfo::getId));
+
+    return jobInfos;
+  }
+
+  /**
+   * Gets information of the given job id (verbose = True).
    *
    * @param jobId the id of the job
    * @return the job information
    * @throws JobDoesNotExistException if the job does not exist
    */
   public JobInfo getStatus(long jobId) throws JobDoesNotExistException {
+    return getStatus(jobId, true);
+  }
+
+  /**
+   * Gets information of the given job id.
+   *
+   * @param jobId the id of the job
+   * @param verbose whether the job info should be verbose
+   * @return the job information
+   * @throws JobDoesNotExistException if the job does not exist
+   */
+  public JobInfo getStatus(long jobId, boolean verbose) throws JobDoesNotExistException {
     PlanCoordinator planCoordinator = mPlanTracker.getCoordinator(jobId);
     if (planCoordinator == null) {
 
-      WorkflowInfo status = mWorkflowTracker.getStatus(jobId);
+      WorkflowInfo status = mWorkflowTracker.getStatus(jobId, verbose);
 
       if (status == null) {
         throw new JobDoesNotExistException(ExceptionMessage.JOB_DOES_NOT_EXIST.getMessage(jobId));
       }
       return status;
     }
-    return planCoordinator.getPlanInfoWire();
+    return planCoordinator.getPlanInfoWire(verbose);
   }
 
   /**
@@ -307,15 +339,7 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
    * @return {@link JobServiceSummary}
    */
   public alluxio.job.wire.JobServiceSummary getSummary() {
-    List<JobInfo> jobInfos = new ArrayList<>();
-
-    for (PlanCoordinator coordinator : mPlanTracker.coordinators()) {
-      jobInfos.add(coordinator.getPlanInfoWire());
-    }
-
-    jobInfos.addAll(mWorkflowTracker.getAllInfo());
-
-    return new JobServiceSummary(jobInfos);
+    return new JobServiceSummary(listDetailed());
   }
 
   /**
@@ -348,6 +372,7 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
         for (PlanCoordinator planCoordinator : mPlanTracker.coordinators()) {
           planCoordinator.failTasksForWorker(deadWorker.getId());
         }
+        mWorkerHealth.remove(deadWorker.getId());
         mWorkers.remove(deadWorker);
       }
       // Generate a new worker id.
@@ -426,7 +451,6 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
         planCoordinator.updateTasks(taskInfosPair.getValue());
       }
     }
-    mWorkflowTracker.workerHeartbeat(taskInfoList);
     return mCommandManager.pollAllPendingCommands(workerId);
   }
 
@@ -467,6 +491,7 @@ public class JobMaster extends AbstractMaster implements NoopJournaled {
             // waiting for exclusive lock.
             final long lastUpdate = mClock.millis() - lostWorker.getLastUpdatedTimeMs();
             if (lastUpdate > masterWorkerTimeoutMs) {
+              mWorkerHealth.remove(lostWorker.getId());
               mWorkers.remove(lostWorker);
             }
           }

@@ -2,7 +2,7 @@
 layout: global
 title: HDFS
 nickname: HDFS
-group: Under Stores
+group: Storage Integrations
 priority: 1
 ---
 
@@ -47,7 +47,7 @@ Please visit the
 page for more information about support for other distributions.
 
 If everything succeeds, you should see
-`alluxio-assembly-server-{{site.ALLUXIO_RELEASED_VERSION}}-jar-with-dependencies.jar` created in
+`alluxio-assembly-server-{{site.ALLUXIO_VERSION_STRING}}-jar-with-dependencies.jar` created in
 the `${ALLUXIO_HOME}/assembly/server/target` directory.
 
 ## Basic Setup
@@ -151,7 +151,7 @@ alluxio.master.mount.table.root.ufs=hdfs://nameservice/
 
 ### User/Permission Mapping
 
-Alluxio supports POSIX-like filesystem [user and permission checking]({{ '/en/advanced/Security.html' | relativize_url }}).
+Alluxio supports POSIX-like filesystem [user and permission checking]({{ '/en/operation/Security.html' | relativize_url }}).
 To ensure that the permission information of files/directories including user, group and mode in
 HDFS is consistent with Alluxio (e.g., a file created by user Foo in Alluxio is persisted to
 HDFS also with owner as user Foo), the user to start Alluxio master and worker processes
@@ -245,7 +245,7 @@ alluxio.master.mount.table.root.option.alluxio.underfs.version=2.2
 
 #### Supported HDFS Versions
 
-Alluxio v{{site.ALLUXIO_RELEASED_VERSION}} supports the following versions of HDFS as a valid argument of mount option `alluxio.underfs.version`:
+Alluxio supports the following versions of HDFS as a valid argument of mount option `alluxio.underfs.version`:
 
 - Apache Hadoop: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1
 

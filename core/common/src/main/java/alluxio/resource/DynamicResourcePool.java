@@ -99,7 +99,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
     private long mInitialDelayMs = 100;
 
     /** The gc interval. */
-    private long mGcIntervalMs = 120 * Constants.SECOND_MS;
+    private long mGcIntervalMs = 120L * Constants.SECOND_MS;
 
     /** The gc executor. */
     private ScheduledExecutorService mGcExecutor;
@@ -199,7 +199,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
     }
   }
 
-  private final ReentrantLock mLock = new ReentrantLock();//保证资源队列安全
+  private final ReentrantLock mLock = new ReentrantLock();
   private final Condition mNotEmpty = mLock.newCondition();
 
   /** The max capacity. */
@@ -267,7 +267,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
       }
 
       for (T resource : resourcesToGc) {
-        LOG.info("Resource {} is garbage collected.", resource);
+        LOG.debug("Resource {} is garbage collected.", resource);
         try {
           closeResource(resource);
         } catch (IOException e) {
@@ -311,7 +311,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
     // Try to take a resource without blocking
     ResourceInternal<T> resource = poll();
     if (resource != null) {
-      return checkHealthyAndRetry(resource.mResource, endTimeMs);//和acquire存在递归调用；如果拿到的resource是健康的推出；反之，继续递归遍历队列直到整个队列都没有。走下面创建新资源
+      return checkHealthyAndRetry(resource.mResource, endTimeMs);
     }
 
     if (!isFull()) {
@@ -320,7 +320,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
       ResourceInternal<T> resourceInternal = new ResourceInternal<>(newResource);
       if (add(resourceInternal)) {
         return newResource;
-      } else {//如果不满足创建新资源条件，关闭newResource
+      } else {
         closeResource(newResource);
       }
     }
@@ -328,9 +328,9 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
     // Otherwise, try to take a resource from the pool, blocking if none are available.
     try {
       mLock.lock();
-      while (true) {//block 等待 mNotEmpty 信号获取可用资源
+      while (true) {
         resource = poll();
-        if (resource != null) {//拿到资源，退出
+        if (resource != null) {
           break;
         }
         long currTimeMs = mClock.millis();
@@ -351,7 +351,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
       mLock.unlock();
     }
 
-    return checkHealthyAndRetry(resource.mResource, endTimeMs);//检测资源健康度
+    return checkHealthyAndRetry(resource.mResource, endTimeMs);
   }
 
   /**
@@ -372,7 +372,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
           "Resource " + resource.toString() + " was not acquired from this resource pool.");
     }
     ResourceInternal<T> resourceInternal = mResources.get(resource);
-    resourceInternal.setLastAccessTimeMs(mClock.millis());//设置资源最近访问时间
+    resourceInternal.setLastAccessTimeMs(mClock.millis());
     try {
       mLock.lock();
       mAvailableResources.addFirst(resourceInternal);
@@ -424,7 +424,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
   private boolean add(ResourceInternal<T> resource) {
     try {
       mLock.lock();
-      if (mResources.size() >= mMaxCapacity) {//加入的超出容量
+      if (mResources.size() >= mMaxCapacity) {
         return false;
       } else {
         mResources.put(resource.mResource, resource);
@@ -455,7 +455,7 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
   private ResourceInternal<T> poll() {
     try {
       mLock.lock();
-      return mAvailableResources.pollFirst();//拿到第一个
+      return mAvailableResources.pollFirst();
     } finally {
       mLock.unlock();
     }
@@ -473,11 +473,11 @@ public abstract class DynamicResourcePool<T> implements Pool<T> {
   private T checkHealthyAndRetry(T resource, long endTimeMs) throws TimeoutException, IOException {
     if (isHealthy(resource)) {
       return resource;
-    } else {//删除不健康的资源
-      LOG.info("Clearing unhealthy resource {}.", resource);
+    } else {
+      LOG.debug("Clearing unhealthy resource {}.", resource);
       remove(resource);
       closeResource(resource);
-      return acquire(endTimeMs - mClock.millis(), TimeUnit.MILLISECONDS);//继续请求获取资源
+      return acquire(endTimeMs - mClock.millis(), TimeUnit.MILLISECONDS);
     }
   }
 

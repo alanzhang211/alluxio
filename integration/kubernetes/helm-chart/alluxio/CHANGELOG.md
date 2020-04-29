@@ -29,9 +29,45 @@
 
 0.5.1
 
-- Fix tiered store issue
-- Fix the issue of the user group of worker is not configurable
+- Fixed tiered store issue
+- Fixed the issue of the user group of worker is not configurable
 
 0.5.2
 
-- Fix apiVersion key in Chart.yaml
+- Fixed apiVersion key in Chart.yaml
+
+0.5.3
+
+- Changed to using one single StatefulSet for all master Pods
+- Changed embedded journal from emptyDir to auto-created PVC
+- Changed values.yaml structure for ports and update configmap
+- Define alluxio.master.hostname individually for each Pod in env variable, and update configmap
+- Moved a few duplicated blocks into _helpers.tpl
+
+0.5.4
+
+- Updated the journal formatting Job logic
+- Misc formatting and parameters updates
+
+0.5.5
+
+- Removed extra resources created by Helm install https://github.com/Alluxio/alluxio/issues/10321
+
+0.5.6
+
+- Added readiness and liveness probes for master and worker containers
+- Removed formatting script under format/
+
+0.5.7
+
+- Moved journal formatting from job/format-journal-job.yaml to initContainer in master/statefulset.yaml
+- Changed the master RocksDB metastore volume from emptyDir to PVC
+- Added support for using PVC for tiered storage
+
+0.5.8
+
+- Added option to disable worker short-circuit
+- Changed worker domain socket volume from hostPath to PVC
+- Changed hostNetwork to false
+- Added alluxio.worker.container.hostname property to use podIP
+- Added selector labels to worker domain socket PVC

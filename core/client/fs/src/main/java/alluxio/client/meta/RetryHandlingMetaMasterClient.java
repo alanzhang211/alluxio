@@ -13,24 +13,23 @@ package alluxio.client.meta;
 
 import alluxio.AbstractMasterClient;
 import alluxio.Constants;
-import alluxio.exception.status.AlluxioStatusException;
 import alluxio.grpc.BackupPRequest;
 import alluxio.grpc.BackupStatusPRequest;
 import alluxio.grpc.CheckpointPOptions;
 import alluxio.grpc.GetConfigReportPOptions;
 import alluxio.grpc.GetMasterInfoPOptions;
-import alluxio.grpc.GetMetricsPOptions;
 import alluxio.grpc.MasterInfo;
 import alluxio.grpc.MasterInfoField;
 import alluxio.grpc.MetaMasterClientServiceGrpc;
-import alluxio.grpc.MetricValue;
 import alluxio.grpc.ServiceType;
 import alluxio.master.MasterClientContext;
 import alluxio.wire.BackupStatus;
 import alluxio.wire.ConfigCheckReport;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -42,6 +41,7 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public class RetryHandlingMetaMasterClient extends AbstractMasterClient
     implements MetaMasterClient {
+  private static final Logger RPC_LOG = LoggerFactory.getLogger(MetaMasterClient.class);
   private MetaMasterClientServiceGrpc.MetaMasterClientServiceBlockingStub mClient = null;
 
   /**
@@ -75,19 +75,22 @@ public class RetryHandlingMetaMasterClient extends AbstractMasterClient
 
   @Override
   public BackupStatus backup(BackupPRequest backupRequest) throws IOException {
-    return retryRPC(() -> BackupStatus.fromProto(mClient.backup(backupRequest)));
+    return retryRPC(() -> BackupStatus.fromProto(mClient.backup(backupRequest)),
+        RPC_LOG, "Backup", "backupRequest=%s", backupRequest);
   }
 
   @Override
   public BackupStatus getBackupStatus(UUID backupId) throws IOException {
     return retryRPC(() -> BackupStatus.fromProto(mClient.getBackupStatus(
-        BackupStatusPRequest.newBuilder().setBackupId(backupId.toString()).build())));
+        BackupStatusPRequest.newBuilder().setBackupId(backupId.toString()).build())),
+        RPC_LOG, "GetBackupStatus", "backupId=%s", backupId);
   }
 
   @Override
   public ConfigCheckReport getConfigReport() throws IOException {
     return retryRPC(() -> ConfigCheckReport.fromProto(
-        mClient.getConfigReport(GetConfigReportPOptions.getDefaultInstance()).getReport()));
+        mClient.getConfigReport(GetConfigReportPOptions.getDefaultInstance()).getReport()),
+        RPC_LOG, "GetConfigReport", "");
   }
 
   @Override
@@ -95,18 +98,13 @@ public class RetryHandlingMetaMasterClient extends AbstractMasterClient
       throws IOException {
     return retryRPC(() -> mClient
         .getMasterInfo(GetMasterInfoPOptions.newBuilder().addAllFilter(fields).build())
-        .getMasterInfo());
-  }
-
-  @Override
-  public Map<String, MetricValue> getMetrics() throws AlluxioStatusException {
-    return retryRPC(
-        () -> mClient.getMetrics(GetMetricsPOptions.getDefaultInstance()).getMetricsMap());
+        .getMasterInfo(), RPC_LOG, "GetMasterInfo", "fields=%s", fields);
   }
 
   @Override
   public String checkpoint() throws IOException {
     return retryRPC(() -> mClient
-        .checkpoint(CheckpointPOptions.newBuilder().build()).getMasterHostname());
+        .checkpoint(CheckpointPOptions.newBuilder().build()).getMasterHostname(),
+        RPC_LOG, "Checkpoint", "");
   }
 }

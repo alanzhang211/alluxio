@@ -19,6 +19,7 @@ import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.ServiceType;
 import alluxio.retry.CountingRetry;
+import alluxio.security.user.BaseUserState;
 import alluxio.util.ConfigurationUtils;
 
 import org.junit.Assert;
@@ -126,6 +127,8 @@ public final class AbstractClientTest {
   @Test
   public void confAddress() throws Exception {
     ClientContext context = Mockito.mock(ClientContext.class);
+    Mockito.when(context.getClusterConf()).thenReturn(
+        new InstancedConfiguration(ConfigurationUtils.defaults()));
 
     InetSocketAddress baseAddress = new InetSocketAddress("0.0.0.0", 2000);
     InetSocketAddress confAddress = new InetSocketAddress("0.0.0.0", 2001);
@@ -146,6 +149,9 @@ public final class AbstractClientTest {
     Mockito.doThrow(new RuntimeException("test"))
             .when(context)
             .loadConfIfNotLoaded(argument.capture());
+    Mockito.doReturn(Mockito.mock(BaseUserState.class))
+            .when(context)
+            .getUserState();
 
     try {
       client.connect();
